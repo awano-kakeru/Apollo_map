@@ -1,396 +1,438 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-<title>3D Moon Eclipse Globe</title>
-
-<!-- CesiumJS -->
-<script src="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Cesium.js"></script>
-
-<link
-href="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Widgets/widgets.css"
-rel="stylesheet"
-/>
+<meta charset="UTF-8">
+<title>Interactive Earth with Pins</title>
 
 <style>
-
-html, body, #cesiumContainer{
-    width:100%;
-    height:100%;
+body{
     margin:0;
-    padding:0;
     overflow:hidden;
     background:black;
-    font-family:sans-serif;
 }
 
-/* タイトル */
-
-.titleBox{
-
-    position:absolute;
-    top:20px;
-    left:20px;
-
-    z-index:100;
-
-    color:white;
-
-    background:rgba(0,0,0,0.7);
-
-    padding:20px;
-
-    border-radius:20px;
-
-    backdrop-filter:blur(10px);
-
-    box-shadow:
-        0 0 30px rgba(0,170,255,0.5);
-
-}
-
-.titleBox h1{
-    margin:0;
-    color:#8fe7ff;
-}
-
-/* 情報 */
-
-.infoPanel{
+/* 吹き出し */
+#popup{
 
     position:absolute;
 
-    top:20px;
-    right:20px;
-
-    width:300px;
-
-    z-index:100;
-
-    color:white;
-
-    background:rgba(0,0,0,0.7);
-
-    padding:20px;
-
-    border-radius:20px;
-
-    backdrop-filter:blur(10px);
-
-}
-
-.eclipseItem{
-
-    margin-top:10px;
-
-    padding:10px;
-
-    border-radius:10px;
-
-    background:rgba(255,255,255,0.06);
-
-}
-
-/* ボタン */
-
-.spaceButton{
-
-    width:100%;
-
-    margin-top:12px;
+    min-width:220px;
 
     padding:12px;
 
-    border:none;
-
-    border-radius:12px;
-
-    cursor:pointer;
+    background:rgba(0,0,0,0.85);
 
     color:white;
-    font-weight:bold;
 
-    background:
-        linear-gradient(
-            45deg,
-            #246bfd,
-            #00d0ff
-        );
+    border-radius:0px;
 
-    transition:0.3s;
+    border:1px solid #00e5ff;
 
+    font-family:sans-serif;
+
+    display:none;
+
+    z-index:1000;
+
+    box-shadow:0 0 20px rgba(0,229,255,0.5);
+
+    backdrop-filter:blur(4px);
 }
 
-.spaceButton:hover{
-
-    transform:scale(1.04);
-
-    box-shadow:
-        0 0 20px #00d0ff;
-
+/* タイトル */
+#popup h3{
+    margin:0 0 8px 0;
+    color:#00e5ff;
 }
 
-/* Cesiumロゴ非表示 */
-
-.cesium-widget-credits{
-    display:none !important;
+/* 本文 */
+#popup p{
+    margin:0;
+    line-height:1.5;
 }
-
 </style>
 </head>
 
 <body>
 
-<div id="cesiumContainer"></div>
+    <div id="popup"></div>
 
-<!-- タイトル -->
-
-<div class="titleBox">
-
-    <h1> Moon Eclipse Globe GIS</h1>
-
-    <p>
-        世界の皆既日食を<br>
-        3D地球で可視化
-    </p>
-
-</div>
-
-<!-- パネル -->
-
-<div class="infoPanel">
-
-    <h2> Eclipse Data</h2>
-
-    <div class="eclipseItem">
-        🇪🇸 2026 スペイン皆既日食
-    </div>
-
-    <div class="eclipseItem">
-        🇪🇬 2027 エジプト皆既日食
-    </div>
-
-    <div class="eclipseItem">
-        🇺🇸 2045 アメリカ横断日食
-    </div>
-
-    <button
-        class="spaceButton"
-        onclick="flyJapan()"
-    >
-        🇯🇵 日本
-    </button>
-
-    <button
-        class="spaceButton"
-        onclick="flyAmerica()"
-    >
-        🇺🇸 アメリカ
-    </button>
-
-</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
 
-// =====================================
-// Cesium Token
-// =====================================
+const scene = new THREE.Scene();
 
-Cesium.Ion.defaultAccessToken =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjZTg5YTM0ZS0zMmQ2LTQ2M2UtOTg5Ny0yZDY0ZmNjYTRmNTIiLCJpZCI6NDM2ODY1LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3Nzk4NDczNjZ9.GiENKFaMJ6WwZEE292-v6HKNkcddVK1qo3FExb8aUCU";
+const raycaster = new THREE.Raycaster();
 
-// =====================================
-// Viewer
-// =====================================
+const mouse = new THREE.Vector2();
 
-const viewer = new Cesium.Viewer(
-    "cesiumContainer",
-{
+const clickablePins = [];
 
-    animation:false,
-    timeline:false,
-    baseLayerPicker:false,
-    geocoder:false,
+const popup = document.getElementById("popup");
 
-    terrain: Cesium.Terrain.fromWorldTerrain()
-
-});
-
-// =====================================
-// 衛星画像
-// =====================================
-
-viewer.imageryLayers.removeAll();
-
-viewer.imageryLayers.addImageryProvider(
-
-    new Cesium.UrlTemplateImageryProvider({
-
-        url:
-        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-
-    })
-
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
 );
 
-// =====================================
-// 宇宙感
-// =====================================
+camera.position.z = 2;
 
-viewer.scene.globe.enableLighting = true;
-
-viewer.scene.skyAtmosphere.show = true;
-
-viewer.scene.globe.dynamicAtmosphereLighting = true;
-
-// =====================================
-// 初期カメラ
-// =====================================
-
-viewer.camera.flyTo({
-
-    destination:
-    Cesium.Cartesian3.fromDegrees(
-        140,
-        35,
-        25000000
-    )
-
+const renderer = new THREE.WebGLRenderer({
+    antialias:true
 });
 
-// =====================================
-// 日食ポイント
-// =====================================
+renderer.setSize(window.innerWidth, window.innerHeight);
 
-const eclipseData = [
+document.body.appendChild(renderer.domElement);
+
+// コントロール
+const controls = new THREE.OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+controls.enableDamping = true;
+
+// ======================
+// 地球
+// ======================
+
+const loader = new THREE.TextureLoader();
+
+let earth;
+
+let eclipseShadow;
+
+loader.load(
+    'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+
+    function(texture){
+
+        const geometry = new THREE.SphereGeometry(0.7, 64, 64);
+
+        const material = new THREE.MeshBasicMaterial({
+            map:texture
+        });
+
+        earth = new THREE.Mesh(geometry, material);
+
+        scene.add(earth);
+
+        // ======================
+// 月の影
+// ======================
+
+const shadowGeometry =
+    new THREE.SphereGeometry(0.08, 32, 32);
+
+const shadowMaterial =
+    new THREE.MeshBasicMaterial({
+        color:0x000000,
+        transparent:true,
+        opacity:0.45
+    });
+
+eclipseShadow =
+    new THREE.Mesh(
+        shadowGeometry,
+        shadowMaterial
+    );
+
+scene.add(eclipseShadow);
+
+        // ピン追加（地球のあと）
+        addPins();
+
+        animate();
+    }
+);
+
+// ======================
+// ピン変換関数
+// ======================
+
+function latLonToVector3(lat, lon, radius){
+
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lon + 180) * (Math.PI / 180);
+
+    const x = -radius * Math.sin(phi) * Math.cos(theta);
+    const z = radius * Math.sin(phi) * Math.sin(theta);
+    const y = radius * Math.cos(phi);
+
+    return new THREE.Vector3(x, y, z);
+}
+
+function createArc(points, color=0xff6666){
+
+    const vectors = [];
+
+    points.forEach(p => {
+
+        vectors.push(
+            latLonToVector3(
+                p.lat,
+                p.lon,
+                0.75
+            )
+        );
+    });
+
+    const geometry =
+        new THREE.BufferGeometry().setFromPoints(vectors);
+
+    const material =
+        new THREE.LineBasicMaterial({
+            color:color
+        });
+
+    const line =
+        new THREE.Line(geometry, material);
+
+    scene.add(line);
+}
+
+// ======================
+// ピンデータ
+// ======================
+
+const pins = [
 
 {
-    name:"2026 スペイン皆既日食",
-    lon:-3.7,
-    lat:40.4,
-    desc:"スペイン周辺で観測"
+    name:"2034 皆既日食",
+    lat:33,
+    lon:90,
+    description:"中国付近で皆既日食"
 },
 
 {
-    name:"2027 エジプト皆既日食",
-    lon:31.2,
-    lat:30.0,
-    desc:"史上最長級"
-},
-
-{
-    name:"2045 アメリカ皆既日食",
-    lon:-96.8,
-    lat:32.7,
-    desc:"アメリカ横断"
+    name:"ブラジル開始地点",
+    lat:-1,
+    lon:-38,
+    description:"2034年日食の開始地点"
 }
 
 ];
 
-// =====================================
+const eclipsePath = [
+
+    {lat:-1, lon:-38},
+    {lat:5, lon:-20},
+    {lat:9, lon:0},
+    {lat:13, lon:15},
+    {lat:17, lon:30},
+    {lat:23, lon:45},
+    {lat:28, lon:60},
+    {lat:31, lon:75},
+    {lat:33, lon:90},
+    {lat:35, lon:105}
+
+];
+// ======================
 // ピン追加
-// =====================================
+// ======================
 
-eclipseData.forEach(e => {
+function addPins(){
 
-    viewer.entities.add({
 
-        position:
-            Cesium.Cartesian3.fromDegrees(
-                e.lon,
-                e.lat
-            ),
+    pins.forEach(p => {
 
-        point:{
+        const pinGeometry =
+            new THREE.SphereGeometry(0.02, 16, 16);
 
-            pixelSize:15,
+        const pinMaterial =
+            new THREE.MeshBasicMaterial({
+                color:0x00e5ff
+            });
 
-            color:Cesium.Color.CYAN,
+        const pin =
+            new THREE.Mesh(pinGeometry, pinMaterial);
 
-            outlineColor:
-                Cesium.Color.WHITE,
+        const pos =
+            latLonToVector3(
+                p.lat,
+                p.lon,
+                0.72 // 地球より少し外
+            );
 
-            outlineWidth:2
+        pin.position.copy(pos);
 
-        },
+        scene.add(pin);
+pin.userData = p;
 
-        label:{
+clickablePins.push(pin);
 
-            text:e.name,
+        // ラベル代わりの線
+        const lineGeometry =
+            new THREE.BufferGeometry().setFromPoints([
+                pos,
+                pos.clone().multiplyScalar(1.1)
+            ]);
 
-            fillColor:
-                Cesium.Color.WHITE,
+        const lineMaterial =
+            new THREE.LineBasicMaterial({
+                color:0x00e5ff
+            });
 
-            scale:0.6,
+        const line =
+            new THREE.Line(lineGeometry, lineMaterial);
 
-            pixelOffset:
-                new Cesium.Cartesian2(
-                    0,
-                    -25
-                )
-
-        },
-
-        description:`
-
-            <h2>${e.name}</h2>
-
-            <p>${e.desc}</p>
-
-        `
-
+        scene.add(line);
     });
+}
 
+
+createArc([
+
+    {lat:-1, lon:-38},   // ブラジル沖
+    {lat:5, lon:-20},    // 大西洋
+    {lat:9, lon:0},      // 西アフリカ
+    {lat:13, lon:15},    // ナイジェリア
+    {lat:17, lon:30},    // スーダン
+    {lat:23, lon:45},    // サウジ
+    {lat:28, lon:60},    // イラン
+    {lat:31, lon:75},    // パキスタン
+    {lat:33, lon:90},    // インド北部
+    {lat:35, lon:105}    // 中国
+
+], 0xff5533);
+
+createArc([
+
+    {lat:2, lon:-38},
+    {lat:8, lon:-20},
+    {lat:12, lon:0},
+    {lat:16, lon:15},
+    {lat:20, lon:30},
+    {lat:26, lon:45},
+    {lat:31, lon:60},
+    {lat:34, lon:75},
+    {lat:36, lon:90},
+    {lat:38, lon:105}
+
+], 0xffaaaa);
+
+createArc([
+
+    {lat:-4, lon:-38},
+    {lat:1, lon:-20},
+    {lat:5, lon:0},
+    {lat:9, lon:15},
+    {lat:13, lon:30},
+    {lat:18, lon:45},
+    {lat:23, lon:60},
+    {lat:27, lon:75},
+    {lat:29, lon:90},
+    {lat:31, lon:105}
+
+], 0xffaaaa);
+
+window.addEventListener('click', (event)=>{
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects =
+        raycaster.intersectObjects(clickablePins);
+
+    if(intersects.length > 0){
+
+        const pin = intersects[0].object;
+
+       popup.style.display = "block";
+
+popup.style.left = event.clientX + 15 + "px";
+
+popup.style.top = event.clientY + 15 + "px";
+
+popup.innerHTML = `
+    <h3>${pin.userData.name}</h3>
+    <p>${pin.userData.description}</p>
+`;
+    }
+
+    else{
+
+    popup.style.display = "none";
+}
 });
 
-// =====================================
-// 自転
-// =====================================
+// ======================
+// アニメーション
+// ======================
 
-viewer.clock.onTick.addEventListener(() => {
+function animate(){
 
-    viewer.scene.camera.rotate(
-        Cesium.Cartesian3.UNIT_Z,
-        -0.0002
+    requestAnimationFrame(animate);
+
+   
+
+    controls.update();
+
+    renderer.render(scene, camera);
+
+    if(eclipseShadow){
+
+    const time =
+        Date.now() * 0.00008;
+
+    const index =
+        Math.floor(time % eclipsePath.length);
+
+    const nextIndex =
+        (index + 1) % eclipsePath.length;
+
+    const t =
+        time % 1;
+
+    const current =
+        eclipsePath[index];
+
+    const next =
+        eclipsePath[nextIndex];
+
+    const lat =
+        current.lat +
+        (next.lat - current.lat) * t;
+
+    const lon =
+        current.lon +
+        (next.lon - current.lon) * t;
+
+    const pos =
+        latLonToVector3(
+            lat,
+            lon,
+            0.71
+        );
+
+    eclipseShadow.position.copy(pos);
+}
+}
+
+// ======================
+// リサイズ
+// ======================
+
+window.addEventListener('resize', ()=>{
+
+    camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
     );
-
 });
-
-// =====================================
-// カメラ移動
-// =====================================
-
-function flyJapan(){
-
-    viewer.camera.flyTo({
-
-        destination:
-        Cesium.Cartesian3.fromDegrees(
-            138,
-            36,
-            6000000
-        )
-
-    });
-
-}
-
-function flyAmerica(){
-
-    viewer.camera.flyTo({
-
-        destination:
-        Cesium.Cartesian3.fromDegrees(
-            -100,
-            37,
-            6000000
-        )
-
-    });
-
-}
 
 </script>
 

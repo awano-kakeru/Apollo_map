@@ -10,10 +10,52 @@ body{
     overflow:hidden;
     background:black;
 }
+
+/* 吹き出し */
+#popup{
+
+    position:absolute;
+
+    min-width:220px;
+
+    padding:12px;
+
+    background:rgba(0,0,0,0.85);
+
+    color:white;
+
+    border-radius:0px;
+
+    border:1px solid #00e5ff;
+
+    font-family:sans-serif;
+
+    display:none;
+
+    z-index:1000;
+
+    box-shadow:0 0 20px rgba(0,229,255,0.5);
+
+    backdrop-filter:blur(4px);
+}
+
+/* タイトル */
+#popup h3{
+    margin:0 0 8px 0;
+    color:#00e5ff;
+}
+
+/* 本文 */
+#popup p{
+    margin:0;
+    line-height:1.5;
+}
 </style>
 </head>
 
 <body>
+
+    <div id="popup"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -21,6 +63,14 @@ body{
 <script>
 
 const scene = new THREE.Scene();
+
+const raycaster = new THREE.Raycaster();
+
+const mouse = new THREE.Vector2();
+
+const clickablePins = [];
+
+const popup = document.getElementById("popup");
 
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -93,6 +143,35 @@ function latLonToVector3(lat, lon, radius){
     return new THREE.Vector3(x, y, z);
 }
 
+function createArc(points, color=0xff6666){
+
+    const vectors = [];
+
+    points.forEach(p => {
+
+        vectors.push(
+            latLonToVector3(
+                p.lat,
+                p.lon,
+                0.75
+            )
+        );
+    });
+
+    const geometry =
+        new THREE.BufferGeometry().setFromPoints(vectors);
+
+    const material =
+        new THREE.LineBasicMaterial({
+            color:color
+        });
+
+    const line =
+        new THREE.Line(geometry, material);
+
+    scene.add(line);
+}
+
 // ======================
 // ピンデータ
 // ======================
@@ -100,21 +179,17 @@ function latLonToVector3(lat, lon, radius){
 const pins = [
 
 {
-    name:"2026 スペイン日食",
-    lat:40.4,
-    lon:-3.7
+    name:"2034 皆既日食",
+    lat:33,
+    lon:90,
+    description:"中国付近で皆既日食"
 },
 
 {
-    name:"2027 エジプト日食",
-    lat:30.0,
-    lon:31.2
-},
-
-{
-    name:"2045 アメリカ日食",
-    lat:32.7,
-    lon:-96.8
+    name:"ブラジル開始地点",
+    lat:-1,
+    lon:-38,
+    description:"2034年日食の開始地点"
 }
 
 ];
@@ -124,6 +199,7 @@ const pins = [
 // ======================
 
 function addPins(){
+
 
     pins.forEach(p => {
 
@@ -148,6 +224,9 @@ function addPins(){
         pin.position.copy(pos);
 
         scene.add(pin);
+pin.userData = p;
+
+clickablePins.push(pin);
 
         // ラベル代わりの線
         const lineGeometry =
@@ -167,6 +246,85 @@ function addPins(){
         scene.add(line);
     });
 }
+
+
+createArc([
+
+    {lat:-1, lon:-38},   // ブラジル沖
+    {lat:5, lon:-20},    // 大西洋
+    {lat:9, lon:0},      // 西アフリカ
+    {lat:13, lon:15},    // ナイジェリア
+    {lat:17, lon:30},    // スーダン
+    {lat:23, lon:45},    // サウジ
+    {lat:28, lon:60},    // イラン
+    {lat:31, lon:75},    // パキスタン
+    {lat:33, lon:90},    // インド北部
+    {lat:35, lon:105}    // 中国
+
+], 0xff5533);
+
+createArc([
+
+    {lat:2, lon:-38},
+    {lat:8, lon:-20},
+    {lat:12, lon:0},
+    {lat:16, lon:15},
+    {lat:20, lon:30},
+    {lat:26, lon:45},
+    {lat:31, lon:60},
+    {lat:34, lon:75},
+    {lat:36, lon:90},
+    {lat:38, lon:105}
+
+], 0xffaaaa);
+
+createArc([
+
+    {lat:-4, lon:-38},
+    {lat:1, lon:-20},
+    {lat:5, lon:0},
+    {lat:9, lon:15},
+    {lat:13, lon:30},
+    {lat:18, lon:45},
+    {lat:23, lon:60},
+    {lat:27, lon:75},
+    {lat:29, lon:90},
+    {lat:31, lon:105}
+
+], 0xffaaaa);
+
+window.addEventListener('click', (event)=>{
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects =
+        raycaster.intersectObjects(clickablePins);
+
+    if(intersects.length > 0){
+
+        const pin = intersects[0].object;
+
+       popup.style.display = "block";
+
+popup.style.left = event.clientX + 15 + "px";
+
+popup.style.top = event.clientY + 15 + "px";
+
+popup.innerHTML = `
+    <h3>${pin.userData.name}</h3>
+    <p>${pin.userData.description}</p>
+`;
+    }
+
+    else{
+
+    popup.style.display = "none";
+}
+});
 
 // ======================
 // アニメーション

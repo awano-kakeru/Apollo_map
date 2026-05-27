@@ -12,3 +12,29 @@ html, body {
 	width: 100%;   /* 幅を画面全体（100%）に */
 	height: 100vh; /* 高さをビューポートの100%（画面全体）に */
 }
+
+#popup{
+    position:absolute;
+
+    min-width:200px;
+
+    padding:12px;
+
+    background:rgba(0,0,0,0.85);
+
+    color:white;
+
+    border-radius:0px;
+
+    border:1px solid #00e5ff;
+
+    font-family:sans-serif;
+
+    pointer-events:none;
+
+    display:none;
+
+    box-shadow:0 0 20px rgba(0,229,255,0.5);
+
+    backdrop-filter:blur(4px);
+}
