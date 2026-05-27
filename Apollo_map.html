@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>3D Moon Eclipse Globe</title>
+
+<!-- CesiumJS -->
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Cesium.js"></script>
+
+<link
+href="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Widgets/widgets.css"
+rel="stylesheet"
+/>
+
+<style>
+
+html, body, #cesiumContainer{
+    width:100%;
+    height:100%;
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    background:black;
+    font-family:sans-serif;
+}
+
+/* タイトル */
+
+.titleBox{
+
+    position:absolute;
+    top:20px;
+    left:20px;
+
+    z-index:100;
+
+    color:white;
+
+    background:rgba(0,0,0,0.7);
+
+    padding:20px;
+
+    border-radius:20px;
+
+    backdrop-filter:blur(10px);
+
+    box-shadow:
+        0 0 30px rgba(0,170,255,0.5);
+
+}
+
+.titleBox h1{
+    margin:0;
+    color:#8fe7ff;
+}
+
+/* 情報 */
+
+.infoPanel{
+
+    position:absolute;
+
+    top:20px;
+    right:20px;
+
+    width:300px;
+
+    z-index:100;
+
+    color:white;
+
+    background:rgba(0,0,0,0.7);
+
+    padding:20px;
+
+    border-radius:20px;
+
+    backdrop-filter:blur(10px);
+
+}
+
+.eclipseItem{
+
+    margin-top:10px;
+
+    padding:10px;
+
+    border-radius:10px;
+
+    background:rgba(255,255,255,0.06);
+
+}
+
+/* ボタン */
+
+.spaceButton{
+
+    width:100%;
+
+    margin-top:12px;
+
+    padding:12px;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    color:white;
+    font-weight:bold;
+
+    background:
+        linear-gradient(
+            45deg,
+            #246bfd,
+            #00d0ff
+        );
+
+    transition:0.3s;
+
+}
+
+.spaceButton:hover{
+
+    transform:scale(1.04);
+
+    box-shadow:
+        0 0 20px #00d0ff;
+
+}
+
+/* Cesiumロゴ非表示 */
+
+.cesium-widget-credits{
+    display:none !important;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="cesiumContainer"></div>
+
+<!-- タイトル -->
+
+<div class="titleBox">
+
+    <h1> Moon Eclipse Globe GIS</h1>
+
+    <p>
+        世界の皆既日食を<br>
+        3D地球で可視化
+    </p>
+
+</div>
+
+<!-- パネル -->
+
+<div class="infoPanel">
+
+    <h2> Eclipse Data</h2>
+
+    <div class="eclipseItem">
+        🇪🇸 2026 スペイン皆既日食
+    </div>
+
+    <div class="eclipseItem">
+        🇪🇬 2027 エジプト皆既日食
+    </div>
+
+    <div class="eclipseItem">
+        🇺🇸 2045 アメリカ横断日食
+    </div>
+
+    <button
+        class="spaceButton"
+        onclick="flyJapan()"
+    >
+        🇯🇵 日本
+    </button>
+
+    <button
+        class="spaceButton"
+        onclick="flyAmerica()"
+    >
+        🇺🇸 アメリカ
+    </button>
+
+</div>
+
+<script>
+
+// =====================================
+// Cesium Token
+// =====================================
+
+Cesium.Ion.defaultAccessToken =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjZTg5YTM0ZS0zMmQ2LTQ2M2UtOTg5Ny0yZDY0ZmNjYTRmNTIiLCJpZCI6NDM2ODY1LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3Nzk4NDczNjZ9.GiENKFaMJ6WwZEE292-v6HKNkcddVK1qo3FExb8aUCU";
+
+// =====================================
+// Viewer
+// =====================================
+
+const viewer = new Cesium.Viewer(
+    "cesiumContainer",
+{
+
+    animation:false,
+    timeline:false,
+    baseLayerPicker:false,
+    geocoder:false,
+
+    terrain: Cesium.Terrain.fromWorldTerrain()
+
+});
+
+// =====================================
+// 衛星画像
+// =====================================
+
+viewer.imageryLayers.removeAll();
+
+viewer.imageryLayers.addImageryProvider(
+
+    new Cesium.UrlTemplateImageryProvider({
+
+        url:
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+
+    })
+
+);
+
+// =====================================
+// 宇宙感
+// =====================================
+
+viewer.scene.globe.enableLighting = true;
+
+viewer.scene.skyAtmosphere.show = true;
+
+viewer.scene.globe.dynamicAtmosphereLighting = true;
+
+// =====================================
+// 初期カメラ
+// =====================================
+
+viewer.camera.flyTo({
+
+    destination:
+    Cesium.Cartesian3.fromDegrees(
+        140,
+        35,
+        25000000
+    )
+
+});
+
+// =====================================
+// 日食ポイント
+// =====================================
+
+const eclipseData = [
+
+{
+    name:"2026 スペイン皆既日食",
+    lon:-3.7,
+    lat:40.4,
+    desc:"スペイン周辺で観測"
+},
+
+{
+    name:"2027 エジプト皆既日食",
+    lon:31.2,
+    lat:30.0,
+    desc:"史上最長級"
+},
+
+{
+    name:"2045 アメリカ皆既日食",
+    lon:-96.8,
+    lat:32.7,
+    desc:"アメリカ横断"
+}
+
+];
+
+// =====================================
+// ピン追加
+// =====================================
+
+eclipseData.forEach(e => {
+
+    viewer.entities.add({
+
+        position:
+            Cesium.Cartesian3.fromDegrees(
+                e.lon,
+                e.lat
+            ),
+
+        point:{
+
+            pixelSize:15,
+
+            color:Cesium.Color.CYAN,
+
+            outlineColor:
+                Cesium.Color.WHITE,
+
+            outlineWidth:2
+
+        },
+
+        label:{
+
+            text:e.name,
+
+            fillColor:
+                Cesium.Color.WHITE,
+
+            scale:0.6,
+
+            pixelOffset:
+                new Cesium.Cartesian2(
+                    0,
+                    -25
+                )
+
+        },
+
+        description:`
+
+            <h2>${e.name}</h2>
+
+            <p>${e.desc}</p>
+
+        `
+
+    });
+
+});
+
+// =====================================
+// 自転
+// =====================================
+
+viewer.clock.onTick.addEventListener(() => {
+
+    viewer.scene.camera.rotate(
+        Cesium.Cartesian3.UNIT_Z,
+        -0.0002
+    );
+
+});
+
+// =====================================
+// カメラ移動
+// =====================================
+
+function flyJapan(){
+
+    viewer.camera.flyTo({
+
+        destination:
+        Cesium.Cartesian3.fromDegrees(
+            138,
+            36,
+            6000000
+        )
+
+    });
+
+}
+
+function flyAmerica(){
+
+    viewer.camera.flyTo({
+
+        destination:
+        Cesium.Cartesian3.fromDegrees(
+            -100,
+            37,
+            6000000
+        )
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>
